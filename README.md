@@ -12,24 +12,32 @@ agregado sin nombres ni datos de salud.
 
 ## Recorrido
 
-La interfaz, en español, tiene cuatro pasos (pestañas):
+La interfaz está en español, con tema claro en rosa institucional y letra grande. Es un asistente de cuatro pasos con barra de avance y botones «Siguiente» y «Atrás». Se abre en el tablero.
 
-1. **Cargar archivos**: Excel (.xlsx), CSV, PDF, PNG o JPG.
-   - El botón **«Cargar datos de ejemplo»** carga `Datos/atenciones.xlsx` y `Datos/participaciones.xlsx`. Hay más botones para los ejemplos PDF, PNG, Excel y de formato en blanco.
-   - En Excel y CSV se muestra una vista previa y propone qué columna corresponde a cada campo. Por ejemplo, `municipio`/`localidad`, `fecha_atencion`/`dia_evento`, y `nombres`+`apellidos` o `nombre_completo`. La persona confirma el mapeo.
-   - En documentos se ve la página junto a los campos extraídos. Si el PDF tiene texto, se lee directo; si es PNG o PDF escaneado, se aplica OCR local en español.
-2. **Revisar datos**:
-   - Tabla editable con alertas (fecha inválida, sin municipio, edad fuera de rango, sin folio), estado al guardar (nuevo, sin cambios, folio existente con datos diferentes), posible coincidencia, procedencia (archivo y fila o página) y valor original.
-   - Conflictos de folio: *Mantener lo guardado* / *Aplicar lo que llegó*.
-   - Coincidencias entre personas: *Vincular* / *Personas distintas* / *Dejar pendiente*.
-3. **Confirmar**: resumen y guardado en SQLite. Cada corrección queda en la bitácora con campo, valor anterior, valor nuevo, origen y fecha y hora.
-4. **Ver tablero**:
-   - Atenciones y participaciones por separado; las citas agendadas solo aparecen si la fuente las identifica.
-   - Filtros por municipio, programa y periodo, gráfica por municipio y alertas de calidad.
-   - Consulta individual (única vista con nombres y datos de salud), bitácora y fuentes.
-   - Descarga del informe en **Excel** y **PDF**.
+- **Tablero (pantalla de inicio)**:
+  - Cifras grandes de atenciones, participaciones y beneficiarias únicas por separado. Las citas agendadas aparecen solo si la fuente las identifica.
+  - Filtros por municipio, programa y periodo, y gráfica por municipio.
+  - Botones principales: **«Agregar datos»**, **«Descargar informe»** (Excel o PDF) y **«Buscar beneficiaria»**.
+  - Si hay pendientes, un aviso con el botón **«Revisar ahora»**. Los avisos de calidad, las fuentes y la bitácora están en secciones desplegables.
+1. **Cargar archivos**: Excel (.xlsx), CSV, PDF, PNG o JPG, o los botones de ejemplo (atenciones y participaciones, formulario PDF, formulario en foto, Excel de jornada, formato en blanco).
+   - Cada archivo muestra un resumen simple, por ejemplo «Reconocimos atenciones.xlsx: 120 atenciones».
+   - Las columnas se reconocen solas (`municipio`/`localidad`, `fecha_atencion`/`dia_evento`, `nombres`+`apellidos` o `nombre_completo`). La vista previa y la asignación de columnas están en **«Ajustar columnas (avanzado)»**, que se abre solo si falta algo.
+   - Los PDF con texto se leen directo; los PNG o PDF escaneados pasan por OCR local en español.
+2. **Revisar datos**: solo se muestran tarjetas de lo que necesita atención («De 200 registros, 198 están listos y 2 necesitan tu atención»).
+   - Cada tarjeta explica el problema en lenguaje simple y trae el campo para corregirlo; lo demás pasa solo.
+   - Los documentos se muestran junto a sus campos, cada uno marcado como *Extraído automáticamente*, *Corregido en revisión* o *Captura manual*.
+   - «Buscar y corregir cualquier registro (avanzado)» permite editar cualquier otro registro.
+3. **Confirmar**: resumen (nuevas, ya guardadas, folios con datos distintos, correcciones) y botón **«Guardar»**. Cada corrección queda en la bitácora con campo, valor anterior, valor nuevo, origen y fecha y hora.
+4. **Ver tablero**: se regresa al inicio con las cifras actualizadas.
 
-En la barra lateral, **«Reiniciar demo»** borra la base local después de una casilla de confirmación.
+**Revisión de pendientes** (desde «Revisar ahora»):
+- Las posibles coincidencias se muestran **una por una**: dos fichas lado a lado (nombre original, edad, municipio, actividad, de dónde viene), el motivo de la sugerencia y los botones **«Es la misma persona»**, **«Son personas distintas»** y **«Decidir después»**, con contador «Coincidencia 1 de 64».
+- Los casos claros (mismo nombre, edad y municipio) se pueden revisar en bloque, después de ver la lista y marcar una casilla.
+- Los folios repetidos con datos distintos se resuelven con «Conservar lo guardado» o «Usar lo que llegó».
+
+**Buscar beneficiaria**: es la única vista con nombres y datos de salud. Muestra edad y municipio con su fuente, las actividades unidas por revisión humana, las fechas de atención y las citas, solo si la fuente las identifica.
+
+En la barra lateral (oculta por defecto), **«Reiniciar demo»** borra la base local después de una casilla de confirmación.
 
 ### Reglas que aplica
 
@@ -103,6 +111,7 @@ scripts/generar_ejemplos.py Regenera los ejemplos ficticios de Datos/ejemplos/
 Datos/                      Bases sintéticas originales (atenciones.xlsx, participaciones.xlsx)
 Datos/ejemplos/             ejemplo_formulario.pdf/.png, ejemplo_escaneado.pdf, formato_en_blanco.pdf, ejemplo_atenciones_nuevas.xlsx
 tests/                      Pruebas de aceptación, de documentos y recorrido de la interfaz
+.streamlit/config.toml      Tema visual (claro, rosa institucional, letra grande)
 ```
 
 ## Pruebas
@@ -111,7 +120,7 @@ tests/                      Pruebas de aceptación, de documentos y recorrido de
 .\.venv\Scripts\python.exe -m pytest -q tests
 ```
 
-Resultado observado: **22 pruebas aprobadas** (Windows 11, Python 3.14.3, Tesseract 5.4.0). Si Tesseract no está instalado,
+Resultado observado: **24 pruebas aprobadas**, incluidos recorridos completos de la interfaz con `streamlit.testing` (Windows 11, Python 3.14.3, Tesseract 5.4.0). Si Tesseract no está instalado,
 las pruebas de OCR se omiten.
 
 ### Pruebas de aceptación con las dos bases originales
