@@ -2,7 +2,7 @@ import re
 import unicodedata
 from datetime import date, datetime, timedelta
 
-from .config import ALIAS_MUNICIPIO, EDAD_MAX, EDAD_MIN, MUNICIPIOS_CONOCIDOS
+from .config import ALIAS_MUNICIPIO, CITA, EDAD_MAX, EDAD_MIN, MUNICIPIOS_CONOCIDOS
 
 
 def vacio(v) -> bool:
@@ -104,7 +104,7 @@ def banderas(r: dict, hoy: date | None = None) -> list[str]:
         out.append("Sin folio")
     if not r.get("fecha_valida"):
         out.append("Fecha inválida" if r.get("fecha_original") else "Sin fecha")
-    elif r.get("fecha") and date.fromisoformat(r["fecha"]) > hoy:
+    elif r.get("fecha") and date.fromisoformat(r["fecha"]) > hoy and r.get("tipo_evento") != CITA:
         out.append("Fecha futura")
     if vacio(r.get("municipio")):
         out.append("Sin municipio")

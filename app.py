@@ -5,7 +5,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from eira import db, report
+from eira import config, db, report
 from eira.config import (CITA, DATOS, EJEMPLOS, ETIQUETAS, NO_REGISTRADO, SIN_DATOS, SIN_MUNICIPIO, TIPOS_EVENTO)
 from eira.matching import mejor_coincidencia
 from eira.quality import banderas, normalizar_municipio, original, parse_edad, parse_fecha, texto
@@ -26,11 +26,11 @@ ss.setdefault("flash", [])
 
 
 @st.cache_resource
-def conexion():
-    return db.conectar()
+def conexion(ruta: str):
+    return db.conectar(ruta)
 
 
-conn = conexion()
+conn = conexion(str(config.DB_PATH))
 
 
 # ---------------------------------------------------------------- utilidades

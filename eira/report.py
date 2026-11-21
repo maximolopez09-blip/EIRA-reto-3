@@ -58,7 +58,7 @@ def advertencias(conn, df_all: pd.DataFrame) -> list[str]:
     for _, r in df_all.iterrows():
         if not r["fecha_valida"]:
             out.append(f"{r['folio']}: fecha inválida (valor original «{r['fecha_original'] or 'vacío'}»); cuenta en el total general y se excluye de filtros por fecha.")
-        elif r["fecha"] and r["fecha"] > date.today().isoformat():
+        elif r["fecha"] and r["fecha"] > date.today().isoformat() and r["tipo_evento"] != CITA:
             out.append(f"{r['folio']}: fecha futura ({r['fecha']}).")
         if r["municipio_vista"] == SIN_MUNICIPIO:
             out.append(f"{r['folio']}: municipio faltante; se agrupa en «{SIN_MUNICIPIO}».")
