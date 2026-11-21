@@ -19,10 +19,10 @@ La interfaz está en español, con tema claro en rosa institucional y letra gran
   - Filtros por municipio, programa y periodo, y gráfica por municipio.
   - Botones principales: **«Agregar datos»**, **«Descargar informe»** (Excel o PDF) y **«Buscar beneficiaria»**.
   - Si hay pendientes, un aviso con el botón **«Revisar ahora»**. Los avisos de calidad, las fuentes y la bitácora están en secciones desplegables.
-1. **Cargar archivos**: Excel (.xlsx), CSV, PDF, PNG o JPG, o los botones de ejemplo (atenciones y participaciones, formulario PDF, formulario en foto, Excel de jornada, formato en blanco).
+1. **Cargar archivos**: Excel (.xlsx), CSV, PDF, PNG o JPG, o los botones de ejemplo (atenciones y participaciones, formato escaneado en PDF, formato en fotos, Excel de jornada, formato en blanco).
    - Cada archivo muestra un resumen simple, por ejemplo «Reconocimos atenciones.xlsx: 120 atenciones».
    - Las columnas se reconocen solas (`municipio`/`localidad`, `fecha_atencion`/`dia_evento`, `nombres`+`apellidos` o `nombre_completo`). La vista previa y la asignación de columnas están en **«Ajustar columnas (avanzado)»**, que se abre solo si falta algo.
-   - Los PDF con texto se leen directo; los PNG o PDF escaneados pasan por OCR local en español.
+   - Los PDF con texto se leen directo; las fotos o PDF escaneados de los formatos de EIRA llenados a mano se enderezan y se leen campo por campo (ver «Lectura de formatos llenados a mano»); las fotos de páginas sueltas se unen solas. Cualquier otro documento pasa por OCR local en español.
 2. **Revisar datos**: solo se muestran tarjetas de lo que necesita atención («De 200 registros, 198 están listos y 2 necesitan tu atención»).
    - Cada tarjeta explica el problema en lenguaje simple y trae el campo para corregirlo; lo demás pasa solo.
    - Los documentos se muestran junto a sus campos, cada uno marcado como *Extraído automáticamente*, *Corregido en revisión* o *Captura manual*.
@@ -49,12 +49,44 @@ En la barra lateral (oculta por defecto), **«Reiniciar demo»** borra la base l
 | Fechas inválidas | Se conserva el valor original (p. ej. `31/09/2026`), cuentan en el total general y se excluyen de los filtros por fecha. |
 | Municipio vacío | Se agrupa en «Sin municipio». |
 | Padecimiento | Solo se transcribe si la fuente lo registra explícitamente (columna `padecimiento`/`diagnostico`, o «Diagnóstico: …» en el formulario). Si falta: «No registrado». Nunca se deduce del nombre del estudio. |
-| Documentos | Un formulario de una página por atención. Si no se encuentra folio ni nombre, el documento queda como «Sin datos suficientes». Si el OCR falla, se explica la causa y se permite la captura manual. Cada campo queda marcado como *Extraído automáticamente*, *Corregido en revisión* o *Captura manual*. |
+| Documentos | Un formato por atención (las dos páginas del formato mamario pueden venir en un PDF o en dos fotos, que se unen solas). Las lecturas dudosas se señalan para revisarlas contra la imagen. Si no se encuentra folio ni nombre, el documento queda como «Sin datos suficientes». Si el OCR falla, se explica la causa y se permite la captura manual. Cada campo queda marcado como *Extraído automáticamente*, *Corregido en revisión* o *Captura manual*. |
 | Informe | Lleva filtros aplicados, fecha de corte, fuentes, conteos, advertencias y ajustes manuales (los valores de nombre, edad y padecimiento se muestran como «(reservado)»). |
+
+## Lectura de formatos llenados a mano
+
+Los ejemplos de `Datos/ejemplos/` imitan los formatos reales («Formato de revisión mamaria», 2 páginas, y «Solicitud y reporte de
+citología cervical») llenados con letra manuscrita y datos ficticios: fotos de celular (perspectiva, sombra, giro, desenfoque, JPEG)
+y escaneos a 110 ppp. `valores_esperados.json` guarda lo que se escribió en cada uno.
+
+Pasos del preproceso, todos locales y con herramientas open source:
+
+1. **Hoja**: se localiza el papel en la foto y se corrige la perspectiva; se igualan sombras e iluminación (OpenCV).
+2. **Registro**: se identifica formato y página con las palabras impresas (Tesseract) y, si no se alcanzan a leer, comparando
+   el dibujo con el formato en blanco; la imagen se lleva a las coordenadas de la plantilla.
+3. **Recorte**: de cada campo se quita lo impreso (rayas, marcos, etiquetas) comparando con el formato en blanco.
+4. **Lectura**: cada recorte se lee con RapidOCR (modelos PP-OCR en ONNX); las casillas de un solo dígito, con un clasificador de cifras.
+5. **Registro EIRA**: se arma folio, fecha, nombre, edad, municipio y padecimiento (solo si la casilla de resultado está marcada).
+
+Exactitud medida con `scripts/medir_lectura.py` sobre 24 documentos generados aparte (`generar_ejemplos.py --lote 24 --semilla 11`):
+
+| Tipo de campo | Escaneo, exactos | Foto, exactos |
+|---|---|---|
+| Números (fechas, edad, teléfonos…) | 83% | 76% |
+| Códigos de casilla | 82% | 85% |
+| Folio | 83% | 75% |
+| Texto libre (nombre, domicilio…) | 41% (82% de parecido) | 52% (90% de parecido) |
+
+En el registro: edad 22/24, folio 19/24, municipio 17/24, fecha 14/24 y nombre 7/24 exactos. **La letra corrida no se lee de forma
+confiable**: el nombre casi siempre requiere corrección y por eso se marca para revisión salvo lectura muy segura. La lectura es
+una propuesta que la persona confirma en «2. Revisar datos», con la imagen al lado. Estas cifras vienen de letra sintética
+(tipografías manuscritas); con formatos reales pueden ser distintas y conviene medirlas con un lote real.
+
+La primera vez, RapidOCR descarga sus modelos (unos 30 MB) a la carpeta del paquete; después funciona sin conexión.
 
 ## Instalación
 
-Requisitos: Python 3.12 o superior (probado con 3.14.3 en Windows 11) y Tesseract OCR con el idioma español.
+Requisitos: Python 3.12 o superior (probado con 3.14.3 en Windows 11) y Tesseract OCR con el idioma español
+(sin Tesseract los formatos llenados a mano se siguen leyendo; solo se pierde el OCR de otros documentos).
 **No se necesitan credenciales, claves de API ni servicios en la nube**: todo corre en el equipo.
 
 ### Windows
@@ -103,7 +135,8 @@ La app usa `tessdata/spa.traineddata` si existe; si no, el idioma `spa` instalad
 
 ### Dependencias de Python (`requirements.txt`)
 
-streamlit, pandas, openpyxl, rapidfuzz (similitud de nombres), pypdfium2 (texto y render de PDF), pytesseract + Pillow (OCR),
+streamlit, pandas, openpyxl, rapidfuzz (similitud de nombres), pypdfium2 (texto y render de PDF), pytesseract + Pillow (OCR de texto impreso),
+OpenCV + NumPy (enderezado y recorte de campos), RapidOCR + ONNX Runtime (lectura de letra manuscrita),
 fpdf2 (informe PDF y ejemplos), altair (gráficas) y pytest.
 
 ## Estructura
@@ -113,13 +146,21 @@ app.py                      Interfaz Streamlit (4 pasos)
 eira/config.py              Campos, sinónimos de columnas, catálogo de municipios, umbrales
 eira/tabular.py             Lectura de Excel/CSV, propuesta de mapeo, registros con procedencia
 eira/documents.py           PDF con texto, PDF escaneado e imágenes (OCR), extracción de campos del formulario
+eira/lectura.py             Preproceso: hoja, perspectiva, sombras, registro contra la plantilla y recorte de cada campo
+eira/manuscrito.py          Lectura de cada recorte (RapidOCR, clasificador de cifras) y armado del registro
+eira/formatos/*.json        Coordenadas y tipo de cada campo de los formatos (mamario: 2 páginas; citología: 1)
+eira/modelos/mnist-12.onnx  Clasificador de cifras para las casillas de código (ONNX Model Zoo, MIT)
+scripts/plantillas.py       Regenera Datos/formatos/ y eira/formatos/
+scripts/medir_lectura.py    Mide la lectura contra los valores con que se generaron los ejemplos
+scripts/fuentes/            Tipografías manuscritas (licencia OFL) para los ejemplos
 eira/quality.py             Fechas, edades, municipios y alertas de calidad
 eira/matching.py            Normalización y similitud de nombres; vínculos solo confirmados
 eira/db.py                  SQLite: actividades, bitácora, conflictos de folio, decisiones de identidad
 eira/report.py              Filtros, indicadores e informe Excel/PDF
 scripts/generar_ejemplos.py Regenera los ejemplos ficticios de Datos/ejemplos/
 Datos/                      Bases sintéticas originales (atenciones.xlsx, participaciones.xlsx)
-Datos/ejemplos/             ejemplo_formulario.pdf/.png, ejemplo_escaneado.pdf, formato_en_blanco.pdf, ejemplo_atenciones_nuevas.xlsx
+Datos/formatos/             Formatos en blanco: revision_mamaria.pdf (redibujado) y citologia_cervical.pdf
+Datos/ejemplos/             Formatos llenados a mano: *_foto.png, *_escaneo.pdf, valores_esperados.json; formato en blanco; Excel
 tests/                      Pruebas de aceptación, de documentos y recorrido de la interfaz
 .streamlit/config.toml      Tema visual (claro, rosa institucional, letra grande)
 ```
@@ -130,8 +171,7 @@ tests/                      Pruebas de aceptación, de documentos y recorrido de
 .\.venv\Scripts\python.exe -m pytest -q tests
 ```
 
-Resultado observado: **24 pruebas aprobadas**, incluidos recorridos completos de la interfaz con `streamlit.testing` (Windows 11, Python 3.14.3, Tesseract 5.4.0). Si Tesseract no está instalado,
-las pruebas de OCR se omiten.
+Incluye recorridos completos de la interfaz con `streamlit.testing`. Las pruebas de OCR se omiten si Tesseract no está instalado, y las de formatos llenados a mano si falta RapidOCR.
 
 ### Pruebas de aceptación con las dos bases originales
 
@@ -160,12 +200,12 @@ Cada uno pasó por carga → revisión → confirmación → tablero.
 
 | Archivo | Método | Campos extraídos automáticamente | Requirieron corrección |
 |---|---|---|---|
-| `ejemplo_formulario.pdf` (AT-201) | Texto del PDF | folio, fecha, nombre, edad, municipio, programa, servicio y padecimiento («BIRADS 2 - Hallazgos benignos») | Ninguno |
-| `ejemplo_formulario.png` (AT-202) | OCR español | folio, fecha, nombre (con acentos), edad, municipio, programa y servicio. El padecimiento no viene en el formato, así que queda «No registrado» | Ninguno. En la prueba de interfaz se corrige a propósito el municipio (Tuxpan → Zapotiltic) para comprobar que queda como «Corregido en revisión» y se registra en la bitácora |
-| `ejemplo_escaneado.pdf` (AT-202) | OCR de PDF escaneado | Igual que el PNG | Ninguno |
-| `formato_en_blanco.pdf` | Texto del PDF | Solo el encabezado impreso (programa y servicio) | «Sin datos suficientes»; no se guarda sin captura manual de folio y nombre |
-| Formatos reales de EIRA en blanco (PDF de citología y 2 fotos del formato mamario) | Texto / OCR | — | «Sin datos suficientes» en los tres |
-| OCR no disponible (prueba con `TESSERACT_CMD` inválido) | Captura manual | — | Muestra «No se encontró Tesseract…»; los campos capturados quedan como «Captura manual» |
+| `mamaria_foto.png` + `mamaria_foto_pagina2.png` (AT-201) | Formato llenado a mano (foto) | folio, fecha, nombre, edad, municipio y padecimiento («BIRADS 2 - Hallazgos benignos», de la casilla de la página 2) | Ninguno; la fecha sale marcada como dudosa |
+| `mamaria_escaneo.pdf` (AT-202) | Formato llenado a mano (PDF escaneado, 110 ppp) | folio, fecha, edad, municipio, padecimiento | Nombre (una letra) |
+| `citologia_foto.png` (AT-203) | Formato llenado a mano (foto) | folio, fecha | Nombre, edad y diagnóstico: es la foto más difícil; los tres salen marcados como dudosos |
+| `citologia_escaneo.pdf` (AT-204) | Formato llenado a mano (PDF escaneado) | folio, fecha, edad, padecimiento | Nombre y municipio (marcados como dudosos) |
+| `formato_en_blanco_escaneo.pdf` | Formato reconocido, sin nada escrito | — | «Sin datos suficientes»; no se guarda sin captura manual de folio y nombre |
+| Documento que no es un formato, sin Tesseract (`TESSERACT_CMD` inválido) | Captura manual | — | Muestra «No se encontró Tesseract…»; los campos capturados quedan como «Captura manual» |
 | `ejemplo_atenciones_nuevas.xlsx` (AT-301..306) | Columnas con otros encabezados | Las 9 columnas se mapean solas (`Folio`, `Fecha`, `Municipio de residencia`, `Nombre completo`, `Edad`, `Programa`, `Servicio`, `Padecimiento`, `tipo_registro`) | Ninguno. Además: AT-305 es «Cita agendada» y no suma a atenciones; AT-302 trae el padecimiento «Cervicitis»; AT-304 no tiene municipio; se sugiere AT-303 «Teresa Navaro Flores» con AT-004 |
 
 ## Limitaciones del prototipo

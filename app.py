@@ -117,7 +117,8 @@ def problemas(r) -> list[tuple[str, str]]:
         elif b == "Sin nombre":
             out.append(("nombre", "Falta el nombre de la persona."))
     for n in r.get("notas", []):
-        out.append(("municipio", f"{n}. Confírmalo."))
+        if not n.startswith("Lectura dudosa"):  # esas se muestran junto a la imagen del documento
+            out.append(("municipio", f"{n}. Confírmalo."))
     return out
 
 
@@ -127,9 +128,27 @@ def resumen_tipos(regs) -> str:
     return " y ".join(f"{n} {plural[t] if n != 1 else t.lower()}" for t, n in cuenta.items()) or "0 registros"
 
 
+def unir_pagina(lote: dict) -> bool:
+    """Si el archivo es otra página suelta de un formato ya cargado (p. ej. la foto del reverso), se une a ese documento."""
+    from eira import documents
+    f = lote["doc"].get("formulario")
+    for otro in ss.lotes.values():
+        g = otro.get("doc", {}).get("formulario") if otro.get("tipo") in ("pdf", "imagen") else None
+        if f and g and g["formato"] == f["formato"] and not set(g["paginas"]) & set(f["paginas"]) and 0 in set(g["paginas"]) | set(f["paginas"]):
+            otro["partes"] = sorted(otro["partes"] + lote["partes"])
+            otro["archivo"] = otro["partes"][0][1]
+            otro["doc"] = documents.procesar_varios([(n, c) for _, n, c in otro["partes"]])
+            otro["registros"] = preparar([documents.a_registro(otro["doc"], otro["archivo"])])
+            otro["shas"] = otro.get("shas", []) + [lote["sha"]]
+            otro["version"] += 1
+            ss.flash.append(("info", f"«{lote['archivo']}» se unió a «{otro['archivo']}»: son páginas del mismo formato."))
+            return True
+    return False
+
+
 def nuevo_lote(nombre: str, contenido: bytes):
     sha = hashlib.sha256(contenido).hexdigest()
-    if any(l["sha"] == sha for l in ss.lotes.values()):
+    if any(sha in (l["sha"], *l.get("shas", [])) for l in ss.lotes.values()):
         ss.flash.append(("info", f"«{nombre}» ya estaba en la lista."))
         return
     ss.contador += 1
@@ -150,6 +169,9 @@ def nuevo_lote(nombre: str, contenido: bytes):
             from eira import documents
             lote["tipo"] = "pdf" if low.endswith(".pdf") else "imagen"
             lote["doc"] = documents.procesar(nombre, contenido)
+            lote["partes"] = [(((lote["doc"].get("formulario") or {}).get("paginas") or [0])[0], nombre, contenido)]
+            if unir_pagina(lote):
+                return
             lote["registros"] = preparar([documents.a_registro(lote["doc"], nombre)])
         else:
             ss.flash.append(("error", f"No podemos leer archivos de este tipo: {nombre}"))
@@ -371,10 +393,10 @@ elif pagina == "cargar":
     ej.caption("¿Quieres probar? Usa un ejemplo:")
     for etq, archivos, icono, key in [
         ("Atenciones y participaciones", ("atenciones.xlsx", "participaciones.xlsx"), ":material/table_chart:", "ej_bases"),
-        ("Formulario PDF", ("ejemplo_formulario.pdf",), ":material/picture_as_pdf:", "ej_pdf"),
-        ("Formulario en foto", ("ejemplo_formulario.png",), ":material/photo_camera:", "ej_png"),
+        ("Formato escaneado (PDF)", ("citologia_escaneo.pdf",), ":material/picture_as_pdf:", "ej_pdf"),
+        ("Formato en fotos", ("mamaria_foto.png", "mamaria_foto_pagina2.png"), ":material/photo_camera:", "ej_png"),
         ("Excel de jornada", ("ejemplo_atenciones_nuevas.xlsx",), ":material/grid_on:", "ej_excel"),
-        ("Formato en blanco", ("formato_en_blanco.pdf",), ":material/draft:", "ej_blanco")]:
+        ("Formato en blanco", ("formato_en_blanco_escaneo.pdf",), ":material/draft:", "ej_blanco")]:
         ej.button(etq, icon=icono, on_click=cargar_ejemplo, args=archivos, key=key)
 
     for lote in list(ss.lotes.values()):
@@ -433,7 +455,9 @@ elif pagina == "cargar":
                 else:
                     c2.markdown(f":green[:material/check_circle:] **Leímos {lote['archivo']}** ({lectura}): "
                                 f"{r.get('folio') or 'sin folio'} · {r.get('nombre') or 'sin nombre'}")
-                if doc.get("paginas", 1) > 1:
+                if doc.get("formulario"):
+                    c2.caption(f"{doc['formulario']['titulo']} · {doc['paginas']} página(s) leída(s) campo por campo.")
+                elif doc.get("paginas", 1) > 1:
                     c2.caption(f"Tiene {doc['paginas']} páginas; solo se lee la primera.")
 
     nav = st.container(horizontal=True, horizontal_alignment="distribute")
@@ -472,8 +496,11 @@ elif pagina == "revisar":
                 st.markdown(f":material/description: {titulo}")
                 st.caption(f"{origen} · revisa que los datos coincidan con el documento")
                 izq, der = st.columns([1, 1])
-                if doc.get("imagen") is not None:
-                    izq.image(doc["imagen"], alt=f"Documento {lote['archivo']}")
+                for n, im in enumerate(doc.get("imagenes") or ([doc["imagen"]] if doc.get("imagen") is not None else [])):
+                    izq.image(im, alt=f"Documento {lote['archivo']}, página {n + 1}")
+                dudosos = (doc.get("formulario") or {}).get("dudosos") or []
+                if dudosos:
+                    der.warning("Lectura dudosa, compárala con la imagen: " + ", ".join(dudosos) + ".", icon=":material/visibility:")
                 if doc.get("error"):
                     der.error(doc["error"], icon=":material/error:")
                 if doc["sin_datos"]:
