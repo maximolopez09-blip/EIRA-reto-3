@@ -71,11 +71,13 @@ def test_recarga_no_duplica(at):
     assert metrica(at, "Atenciones") == "120" and metrica(at, "Participaciones") == "80"
 
 
-def test_png_con_correccion(at):
+def test_fotos_de_dos_paginas_con_correccion(at):
     clic(at, "nav_agregar")
     clic(at, "ej_png")
     clic(at, "sig_revisar")
-    assert entrada(at, "folio").value == "AT-202"
+    # las fotos de las dos páginas quedan como un solo documento
+    assert len([t for t in at.text_input if (t.key or "").startswith("c_") and t.key.endswith("_folio")]) == 1
+    assert entrada(at, "folio").value == "AT-201"
     entrada(at, "municipio").set_value("Zapotiltic").run()
     assert any("Corregido en revisión" in c.value for c in at.caption)
     clic(at, "sig_confirmar")
@@ -85,18 +87,18 @@ def test_png_con_correccion(at):
     import eira.db as edb
     conn = bd()
     act = edb.actividades_df(conn).set_index("folio")
-    assert act.loc["AT-202", "municipio"] == "Zapotiltic" and act.loc["AT-202", "metodo"] == "OCR"
-    ext = edb.extra(act.loc["AT-202", "valores_originales_json"])["extraccion"]
-    assert ext["municipio"] == "Corregido en revisión" and ext["nombre"] == "Extraído automáticamente"
+    assert act.loc["AT-201", "municipio"] == "Zapotiltic" and act.loc["AT-201", "metodo"] == "Formato llenado a mano (foto)"
+    assert act.loc["AT-201", "padecimiento"] == "BIRADS 2 - Hallazgos benignos"
+    ext = edb.extra(act.loc["AT-201", "valores_originales_json"])["extraccion"]
+    assert ext["municipio"] == "Corregido en revisión" and ext["folio"] == "Extraído automáticamente"
     bit = edb.cambios_df(conn)
-    assert ((bit.folio == "AT-202") & (bit.campo == "municipio") & (bit.valor_anterior == "Tuxpan")).any()
+    assert ((bit.folio == "AT-201") & (bit.campo == "municipio") & (bit.valor_anterior == "Zapotlán el Grande")).any()
 
 
-def test_ocr_falla_y_captura_manual(at, monkeypatch):
-    monkeypatch.setenv("TESSERACT_CMD", r"C:\no\existe\tesseract.exe")
+def test_formato_en_blanco_y_captura_manual(at):
     clic(at, "nav_agregar")
-    clic(at, "ej_png")
-    assert any("Tesseract" in m.value for m in at.markdown)
+    clic(at, "ej_blanco")
+    assert any("sin datos suficientes" in m.value for m in at.markdown)
     clic(at, "sig_revisar")
     assert any("Sin datos suficientes" in w.value for w in at.warning)
     entrada(at, "folio").set_value("AT-250").run()
@@ -105,7 +107,7 @@ def test_ocr_falla_y_captura_manual(at, monkeypatch):
     clic(at, "sig_confirmar")
     clic(at, "guardar")
     import eira.db as edb
-    assert edb.actividades_df(bd()).set_index("folio").loc["AT-250", "metodo"] == "captura manual"
+    assert edb.actividades_df(bd()).set_index("folio").loc["AT-250", "nombre"] == "Captura Manual Prueba"
 
 
 def test_coincidencias_una_por_una(at):

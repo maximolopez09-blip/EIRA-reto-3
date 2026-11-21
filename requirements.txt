@@ -5,6 +5,10 @@ rapidfuzz==3.14.6
 pypdfium2==5.15.2
 pytesseract==0.3.13
 Pillow==13.0.0
+numpy==2.5.5
+opencv-python-headless==5.1.0.95
+onnxruntime==1.32.0
+rapidocr==3.10.0
 fpdf2==2.9.0
 altair==6.3.0
 pytest==9.2.0
