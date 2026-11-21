@@ -82,6 +82,16 @@ streamlit run app.py
 
 Después abre http://localhost:8501.
 
+### Publicar en Streamlit Community Cloud
+
+1. Entra a https://share.streamlit.io con la cuenta de GitHub dueña del repositorio y pulsa **Create app** → **Deploy a public app from GitHub**.
+2. Repositorio `maximolopez09-blip/EIRA-reto-3`, rama `main`, archivo principal `app.py`.
+3. En **Advanced settings** elige Python 3.13. No se necesitan *secrets*.
+4. Pulsa **Deploy**. Streamlit instala `requirements.txt` y, desde `packages.txt`, Tesseract con el idioma español.
+
+En la nube, la base SQLite es **compartida por todos los visitantes** y **temporal**: Streamlit la borra cuando reinicia o
+actualiza la app. Úsala solo con los datos ficticios de la demo.
+
 ### Configuración opcional
 
 | Variable | Uso |
